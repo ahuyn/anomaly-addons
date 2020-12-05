@@ -1,0 +1,87 @@
+-- pick section, then pick item in section
+[common]
+food = food_basic
+med = med_basic
+misc = misc_basic
+loot = loot_basic
+[stalker]:common
+loot = loot_artifacts
+[dolg]:common
+food = food_army
+med = med_army
+misc = misc_army
+loot = loot_mutant
+[bandit]:common
+misc = misc_bandit
+[freedom]:dolg
+misc = misc_bandit
+[csky]:stalker
+misc = misc_scientific
+food = food_mutants
+[ecolog]:stalker
+med = med_scientific
+misc = misc_scientific
+[army]:dolg
+[monolith]:dolg
+loot = loot_artifacts
+food = food_mutants
+[killer]:dolg
+loot = loot_merc
+[renegade]:bandit
+[isg]:common
+food = food_army
+med = med_army
+misc = misc_scientific
+[greh]:monolith
+
+; types of food, drink, smokes
+[food_basic]
+bread = 1
+vodka = 2
+vodka_2 = 2
+vodka_quality = 2
+cigarettes = 1
+cigarettes_lucky = 1
+cigarettes_russian = 1
+[food_army]:food_basic
+[food_mutants]
+
+;medical stuff
+[med_basic]
+medkit
+salicidic_acid
+bandage = 1
+caffeine
+drug_sleepingpills
+antirad
+antirad_cystamine
+[med_army]:med_basic
+medkit_army
+stimpack
+stimpack_army
+jgut
+morphine
+antirad_kalium
+[med_bandit]:med_basic
+
+[med_scientific]:med_basic
+medkit_scientic
+stimpack_scientific
+survival_kit
+adrenalin
+
+; repair tools, util items, drugs
+[misc]
+[misc_bandit]
+joint
+marijuana
+cocaine
+[relax_1]
+[relax_2]
+beer
+cigarette
+[util_1]
+swissknife
+
+[util_2]
+lead_box
