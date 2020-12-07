@@ -4126,7 +4126,7 @@
 		<precondition>dialogs_axr_companion.is_not_hostage_task_giver</precondition>
 		<precondition>dialogs.is_trade_init_accept</precondition>
 		<phrase_list>
-			<phrase id="0"> <!-- actor -->
+			<phrase id="0">
 				<text>st_stalker_trade_dialog_init</text>
 				<next>1</next>
 				<next>2</next>
@@ -4147,53 +4147,49 @@
 		<precondition>dialogs_axr_companion.is_not_actor_companion</precondition>
 		<precondition>dialogs_axr_companion.is_not_hostage_task_giver</precondition>
 		<phrase_list>
-			<phrase id="0"> <!-- actor -->
-            <!-- wanna trade? -->
+			<phrase id="0">
 				<text>st_stalker_barter_dialog_init</text> 
-                <!-- yea i'll trade, this is what i got -->
 				<next>1</next>
-                <!-- nah im good -->
 				<next>6</next>
 			</phrase>
-            <phrase id="1"> <!-- npc -->
+            <phrase id="1">
                 <precondition>barter.accept_barter</precondition>
                 <script_text>barter.start_barter</script_text>
-                <!-- swap one -->
                 <next>2</next>
-                <!-- swap two -->
                 <next>3</next>
-                <!-- swap three -->
                 <next>4</next>
-                <!-- swap none -->
                 <next>5</next>
             </phrase>
             <phrase id="2"> <!-- actor -->
                 <precondition>barter.can_trade_1</precondition>
+                <!-- <text>st_stalker_barter_dialog_reply_1_hardcode</text> -->
                 <script_text>barter.accept_1</script_text>
                 <action>barter.trade_1</action>
                 <next>7</next>
             </phrase>
-            <phrase id="3"> <!-- actor -->
+            <phrase id="3"> 
                 <precondition>barter.can_trade_2</precondition>
+                <!-- <text>st_stalker_barter_dialog_reply_2_hardcode</text> -->
                 <script_text>barter.accept_2</script_text>
                 <action>barter.trade_2</action>
                 <next>7</next>
             </phrase>
-            <phrase id="4"> <!-- actor -->
+            <phrase id="4"> 
                 <precondition>barter.can_trade_3</precondition>
                 <script_text>barter.accept_3</script_text>
+                <!-- <text>st_stalker_barter_dialog_reply_3_hardcode</text> -->
                 <action>barter.trade_3</action>
                 <next>7</next>
             </phrase>
-            <phrase id="5"> <!-- actor -->
-                <script_text>dialogs.st_stalker_barter_dialog_leave</script_text>
+            <phrase id="5"> 
+                <text>st_stalker_barter_dialog_leave</text>
             </phrase>
             <phrase id="6"> <!-- npc -->
                 <precondition>barter.decline_barter</precondition>
                 <script_text>dialogs.st_stalker_trade_dialog_reply_no</script_text>
             </phrase>
             <phrase id="7"> <!-- npc -->
-                <text>dialogs.st_stalker_barter_dialog_success</script_text>
+                <text>st_stalker_barter_dialog_success</text>
             </phrase>
         </phrase_list>
     </dialog>

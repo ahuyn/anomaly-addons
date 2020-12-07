@@ -1,4 +1,3 @@
--- pick section, then pick item in section
 [common]
 food = food_basic
 med = med_basic
@@ -7,81 +6,233 @@ loot = loot_basic
 [stalker]:common
 loot = loot_artifacts
 [dolg]:common
-food = food_army
+food = food_army_1
 med = med_army
 misc = misc_army
 loot = loot_mutant
 [bandit]:common
 misc = misc_bandit
+food = food_alternate
 [freedom]:dolg
+food = food_army_2
 misc = misc_bandit
 [csky]:stalker
 misc = misc_scientific
-food = food_mutants
-[ecolog]:stalker
+food = food_alternate
+[ecolog]:common
 med = med_scientific
 misc = misc_scientific
+loot = loot_scientific
 [army]:dolg
 [monolith]:dolg
 loot = loot_artifacts
-food = food_mutants
 [killer]:dolg
 loot = loot_merc
+food = food_merc
 [renegade]:bandit
 [isg]:common
-food = food_army
+food = food_army_2
 med = med_army
 misc = misc_scientific
 [greh]:monolith
 
-; types of food, drink, smokes
 [food_basic]
 bread = 1
+tushonka = 1
+chili = 1
+conserva = 1
 vodka = 2
-vodka_2 = 2
+nuts = 1
 vodka_quality = 2
-cigarettes = 1
+bottle_metal = 1
+energy_drink = 2
+water_drink = 2
+kolbasa = 1
+cigar1 = 1
+cigar2 = 1
+tobacco = 1
 cigarettes_lucky = 1
 cigarettes_russian = 1
-[food_army]:food_basic
-[food_mutants]
 
-;medical stuff
+[food_alternate]
+corn = 1
+tushonka = 1
+conserva = 1
+hand_rolling_tobacco
+vodka_2 = 2
+energy_drink = 2
+water_drink = 1
+beer = 1
+tomato = 1
+chocolate = 2
+cigarettes = 1
+cigar1 = 1
+cigar3 = 1
+cigarettes_lucky = 1
+nuts = 1
+
+[food_army]
+flask = 1
+ration_ru = 4
+ration_ukr = 4
+cuban_cigar = 2
+
+[food_merc]:food_army,food_basic
+mre = 2
+
+[food_army_1]food_army,food_basic
+
+[food_army_2]food_army,food_alternate
+
 [med_basic]
-medkit
-salicidic_acid
+medkit = 2
+salicidic_acid = 1
 bandage = 1
-caffeine
-drug_sleepingpills
-antirad
-antirad_cystamine
+drug_coagulant = 1
+drug_radioprotector = 2
+caffeine = 1
+drug_sleepingpills = 1
+antirad = 2
+antirad_cystamine = 1
+drug_booster = 4
 [med_army]:med_basic
-medkit_army
-stimpack
-stimpack_army
-jgut
-morphine
-antirad_kalium
+medkit_army = 4
+medkit = 1
+stimpack = 2
+stimpack_army = 4
+drug_radioprotector = 4
+drug_booster = 2
+jgut = 1
+morphine = 2
+antirad_kalium = 1
 [med_bandit]:med_basic
+joint = 1
+marijuana = 1
+cocaine = 4
+
+[med_freedom]:med_bandit,med_army
 
 [med_scientific]:med_basic
-medkit_scientic
-stimpack_scientific
-survival_kit
-adrenalin
+medkit_scientic = 4
+drug_anabiotic = 4
+drug_radioprotector = 1
+antiemetic = 2
+antibio_sulfad = 2
+drug_booster = 2
+stimpack_scientific = 4
+survival_kit = 4
+adrenalin = 4
 
-; repair tools, util items, drugs
-[misc]
-[misc_bandit]
-joint
-marijuana
-cocaine
-[relax_1]
-[relax_2]
-beer
-cigarette
-[util_1]
-swissknife
+[misc_basic]
+swissknife = 1
+cooking = 2
+fieldcooker = 4
+kerosene = 2
+charcoal = 1
+gun_oil = 2
+gun_oil_ru_d = 2
+gun_oil_ru = 1
+sewing_kit_b = 2
+glue_b = 1
+glue_a = 2
+armor_repair_fa = 2
+sharpening_stones = 2
 
-[util_2]
-lead_box
+[misc_army]:misc_basic
+ammo_vog-25 = 2
+ammo_m209 = 2
+army_bowler = 4
+explo_jerrycan_fuel = 2
+explo_balon_gas = 2
+st_sewing_kit_a = 4
+st_sewing_kit_h = 4
+glue_e = 2
+mine = 1
+
+[misc_scientific]:misc_basic
+detector_radio = 2
+lead_box = 1
+
+[misc_bandit]:misc_basic
+ied_rpg = 2
+ied = 2
+
+[loot_basic]
+af_kevlar = 2
+lead_box = 2
+mutant_part_boar_leg = 1
+mutant_part_krovosos_jaw = 4
+mutant_part_dog_tail = 1
+mutant_part_flesh_eye = 1
+mutant_part_psevdodog_tail = 1
+mutant_part_snork_leg = 1
+mutant_part_cat_tail = 1
+mutant_part_fracture_hand = 1
+mutant_part_zombi_hand = 1
+mutant_part_crow_beak = 4
+mutant_part_lurker_eye = 2
+mutant_part_lurker_tail = 2
+mutant_part_psysucker_hand = 2
+
+[loot_artifacts]:loot_basic
+af_black = 4
+af_dragon_eye = 4
+af_fire_loop = 4
+af_ball = 4
+af_moh = 2
+af_tapeworm = 4
+af_fonar = 4
+af_serofim = 4
+af_kogot = 2
+af_elektron = 4
+af_black_angel = 4
+af_grapes = 4
+af_skull_miser = 2
+af_star_phantom = 4
+af_peas = 2
+af_kislushka = 4
+af_zhelch = 4
+af_sandstone = 4
+
+[loot_scientific]:loot_artifacts
+af_freon = 4
+af_grid = 4
+af_surge = 4
+af_iam = 2
+af_aac = 4
+af_aam = 8
+af_itcher_lead_box = 8
+af_pin_lead_box = 8
+af_blood_lead_box = 8
+af_mincer_meat_lead_box = 8
+af_electra_sparkler_lead_box = 8
+af_medusa_lead_box = 8
+af_night_star_lead_box = 8
+af_dummy_glassbeads_lead_box = 8
+af_dummy_battery_lead_box = 8
+af_soul_lead_box = 8
+
+[loot_army]:loot_basic
+af_grid = 4
+af_plates = 4
+af_frames = 4
+af_camelbak = 4
+mutant_part_chimera_kogot = 4
+mutant_part_snork_mask = 2
+mutant_part_heart_bloodsucker = 1
+mutant_part_krovosos_jaw = 2
+mutant_part_pseudogigant_hand = 4
+mutant_part_pseudogigant_eye = 4
+
+[loot_merc]:loot_basic
+csky_patch = 1
+dolg_patch = 1
+ecolog_patch = 1
+freedom_patch = 1
+stalker_patch = 1
+bandit_patch = 1
+monolith_patch = 1 
+army_patch = 1 
+renegade_patch = 1
+isg_patch = 1
+greh_patch = 1

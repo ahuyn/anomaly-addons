@@ -87,6 +87,15 @@
 	<string id="st_stalker_barter_dialog_reply_1">
 		<text>Sure. I'll trade you %s for %s.</text>
 	</string>
+	<string id="st_stalker_barter_dialog_reply_1_hardcode">
+		<text>I'll take option 1.</text>
+	</string>
+	<string id="st_stalker_barter_dialog_reply_2_hardcode">
+		<text>I'll take option 2.</text>
+	</string>
+	<string id="st_stalker_barter_dialog_reply_3_hardcode">
+		<text>I'll take option 3.</text>
+	</string>
 	<string id="st_stalker_barter_dialog_reply_0">
 		<text>I have nothing more to trade.</text>
 	</string>
