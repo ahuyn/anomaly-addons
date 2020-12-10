@@ -1,3 +1,9 @@
 Adds a dialog option to chat with stalkers and trade your gear.
 
-Creates up to three random trades per stalker that allows the player to exchange one quantity of items they have for another. Items bartered are dependent on faction.
+Creates up to three random trades per stalker that allows the player to exchange one quantity of items they have for another - food, meds, ammo, grenades, supplies and carried loot. Items bartered are dependent on faction, with rank WIP.
+
+If a stalker asks for a multi-use item, the multi-use item given must have all uses intact to be traded. Conversely, stalkers will give you a full multi-use item.
+
+Included is a tweak to the tables for Weapon Parts Overhaul that scales up the value of weapon cleaning supplies proportionate to their increased value in WPO.
+
+Please report any bugs or crashes. I haven't tested this much but this is a pretty easy addon to remove.

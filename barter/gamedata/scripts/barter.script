@@ -36,13 +36,12 @@ local function build_barter_string(id)
         print_dbg("Barter key: %s. Barter items: Give %s, Take %s", id, v[1], v[2])
     end
     local num = #barters[id]
-    if num == 1 then
-        return strformat(game.translate_string("st_stalker_barter_dialog_reply_1"), bts(barters[id][1][1]), bts(barters[id][1][2]))
-    elseif num == 2 then
-        return strformat(game.translate_string("st_stalker_barter_dialog_reply_2"), bts(barters[id][1][1]), bts(barters[id][1][2]), bts(barters[id][2][1]), bts(barters[id][2][2]))
-    elseif num == 3 then
-        return strformat(game.translate_string("st_stalker_barter_dialog_reply_3"), bts(barters[id][1][1]), bts(barters[id][1][2]), bts(barters[id][2][1]), bts(barters[id][2][2]), bts(barters[id][3][1]), bts(barters[id][3][2]))
-    else return "" end
+    local base = num > 0 and game.translate_string("st_stalker_barter_dialog_reply_base") or game.translate_string("st_stalker_barter_dialog_reply_nothing")
+
+    for i = 1, num do
+        base = base .. strformat(game.translate_string("st_stalker_barter_dialog_reply_addon"), bts(barters[id][i][1]), bts(barters[id][i][2]))
+    end
+    return base
 end
 
 -- create triple of ammo type and quantity
@@ -144,6 +143,12 @@ local function random_section(npc, give, take)
         take_amt = 1
     end
 
+    -- 5% chance for the guy to rip you off and demand double give, needs to be done via rank
+    if math.random(20) == 1 then 
+        print_dbg("Scammed for %s", give_sec)
+        give_amt = give_amt * 2 
+    end
+
     -- balance out exchange ratio
     if (give_amt > take_amt) then
         take_amt = give_amt / take_amt
@@ -154,12 +159,6 @@ local function random_section(npc, give, take)
     else
         give_amt = 1
         take_amt = 1
-    end
-
-    -- 5% chance for the guy to rip you off and demand double give
-    if math.random(20) == 1 then 
-        print_dbg("Scammed for %s", give_sec)
-        give_amt = give_amt * 2 
     end
 
     if (string.find(give_sec, "_patch")) then
@@ -262,7 +261,6 @@ function get_amount(npc, section)
         end
     end
     npc:iterate_inventory(itr, nil)
-    
     return amount
 end
 
@@ -346,9 +344,6 @@ local function trade(a, b, num)
             if barters[id][3] then
                 barters[id][2] = barters[id][3]
                 barters[id][3] = nil
-            elseif barters[id][1] then
-                barters[id][1] = barters[id][2]
-                barters[id][2] = nil
             end
         end
     end

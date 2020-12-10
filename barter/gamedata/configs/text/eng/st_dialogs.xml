@@ -78,32 +78,20 @@
 	<string id="st_stalker_barter_dialog_init">
 		<text>Want to swap some loot?</text>
 	</string>
-	<string id="st_stalker_barter_dialog_reply_3">
-		<text>Sure. I'll trade you %s for %s, %s for %s, or %s for %s.</text>
+	<string id="st_stalker_barter_dialog_reply_base">
+		<text>Sure. I'll give you:</text>
 	</string>
-	<string id="st_stalker_barter_dialog_reply_2">
-		<text>Sure. I'll trade you %s for %s, or %s for %s.</text>
+	<string id="st_stalker_barter_dialog_reply_addon">
+		<text>\n %s in exchange for %s</text>
 	</string>
-	<string id="st_stalker_barter_dialog_reply_1">
-		<text>Sure. I'll trade you %s for %s.</text>
-	</string>
-	<string id="st_stalker_barter_dialog_reply_1_hardcode">
-		<text>I'll take option 1.</text>
-	</string>
-	<string id="st_stalker_barter_dialog_reply_2_hardcode">
-		<text>I'll take option 2.</text>
-	</string>
-	<string id="st_stalker_barter_dialog_reply_3_hardcode">
-		<text>I'll take option 3.</text>
-	</string>
-	<string id="st_stalker_barter_dialog_reply_0">
+	<string id="st_stalker_barter_dialog_reply_nothing">
 		<text>I have nothing more to trade.</text>
 	</string>
 	<string id="st_stalker_barter_dialog_success">
 		<text>Pleasure doing business.</text>
 	</string>
 	<string id="st_stalker_barter_dialog_accept">
-		<text>I'll trade you %s for %s.</text>
+		<text>I'll take your %s for my %s.</text>
 	</string>
 	<string id="st_stalker_barter_dialog_leave">
 		<text>Nevermind.</text>
