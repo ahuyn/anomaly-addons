@@ -1,0 +1,12 @@
+- display loaded magazine in weapon or not
+- extended mags, keep capacity in magazines.ltx
+- figure out how to dynamically read wildcard sections (to load bas weapons)
+- redo storage to be object based instead of string bullshit
+- ready mags undroppable/cannot be stowed
+- mag object binder to dynamically update condition and keep it accurate. also for mapping the 
+
+
+BUGS
+outfit ready slots, no default case. if you have a modded outfit it comes up with nil (add support for this)
+nil check for condition setting (binder might fix)
+(Raven) New script for weapon wheel

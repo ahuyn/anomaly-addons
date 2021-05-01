@@ -1,0 +1,13 @@
+function push(table, value)
+    table[#table + 1] = value
+end
+
+function pop(table)
+    local value = table[#table]
+    table[#table] = nil
+    return value
+end
+
+function peek(table)
+    return table[#table]
+end

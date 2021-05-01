@@ -1,0 +1,1423 @@
+
+local MAGAZINE_CALCULATE_WEIGHT = true
+-- mag data, replace with
+local iMAG_SLOT = 1 -- .slot (S, M, L)
+local iMAG_COUNT = 2 -- .count
+local iMAG_FILL = 3 -- .loaded
+
+local iWEP_MSLOT = 1 -- .slot (S, M, L)
+local iWEP_MSEC = 2 -- .section or "no_mag"
+local iWEP_COUNT = 3 -- .count (int), not needed anymore really
+local iWEP_FILL = 4 -- .loaded (array of nums)
+
+-- map: weapon base type -> magazine base type
+local default_mags_map = {}
+
+function print_dbg( text , ...)
+	if true then
+		printf( text , ...)
+	end
+end
+
+function on_game_start()
+
+	init_mags_map()
+	RegisterScriptCallback("on_key_press", on_key_press)
+	RegisterScriptCallback("actor_on_weapon_fired", actor_on_weapon_fired)
+	RegisterScriptCallback("actor_on_weapon_reload", actor_on_weapon_reload)
+	RegisterScriptCallback("actor_on_weapon_jammed", weapon_jammed)
+	RegisterScriptCallback("ActorMenu_on_item_focus_receive", on_item_focus)
+	RegisterScriptCallback("ActorMenu_on_item_drag_drop", on_item_drag_dropped)
+	RegisterScriptCallback("actor_on_hud_animation_end", animation_end)
+	RegisterScriptCallback("npc_on_death_callback", wuut_npc_on_death_callback)
+	RegisterScriptCallback("ActorMenu_on_trade_started",wuut_OnTrdWndOpened)
+	RegisterScriptCallback("actor_item_to_ruck", UpdateMagazineUI)
+	RegisterScriptCallback("InventoryWndClosed", wuut_InventoryWndClosed)
+	RegisterScriptCallback("DeadBodySearchWndClosed", wuut_DeadBodySearchWndClosed)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("save_state",save_state)
+	RegisterScriptCallback("load_state",load_state)
+	RegisterScriptCallback("server_entity_on_unregister", server_entity_on_unregister)
+	
+	AddUniqueCall(main_loop)
+	
+end 
+
+-- read default magazines
+function init_mags_map()
+	ini_mag_section = ini_file("items\\settings\\weapon_mag_sections.ltx")
+	local n = ini_mag_section:line_count("weapon_mag_sections")
+	for i=1, n do
+		result, id, value = ini_mag_section:r_line_ex("weapon_mag_sections",i,"","")
+
+	end
+end
+
+local wuut_mags_storage = {}
+
+function dump_data(data)
+
+end
+
+function save_state(m_data)
+	m_data.wuut_mags_storage = wuut_mags_storage
+end
+
+function load_state(m_data) 
+	wuut_mags_storage = m_data.wuut_mags_storage or {}
+end
+
+local function server_entity_on_unregister(se_obj)
+	if wuut_mags_storage[se_obj.id] then
+		wuut_mags_storage[se_obj.id] = nil
+	end
+end
+
+function GetMagStorage(id)
+	return wuut_mags_storage[id] or nil
+end
+
+function SetMagStorage(id, data)
+	wuut_mags_storage[id] = data
+end
+
+local state_test = 7
+
+local flag_weapon_jammed = false
+
+function wuut_InventoryWndClosed()
+	print_dbg("wuut_InventoryWndClosed")
+	
+	LoadCurrentWeapon()
+end
+
+function wuut_DeadBodySearchWndClosed()
+	print_dbg("wuut_DeadBodySearchWndClosed")
+	LoadCurrentWeapon()
+end
+
+function weapon_jammed()
+	
+	flag_weapon_jammed = true
+	
+	print_dbg("weapon_jammed")
+	actor_menu.set_msg(1, game.translate_string("st_mag_weapon_jammed"),4)
+
+end
+
+function actor_on_first_update()
+	local function itr_inv(temp,inv_mag)
+
+		if ( isMagazine(inv_mag) ) then 
+			MagazineCalculateWeight(inv_mag)
+		end
+	end
+	
+	if(MAGAZINE_CALCULATE_WEIGHT) then
+		db.actor:iterate_inventory(itr_inv)
+	end
+end
+
+function on_key_press(key)
+	StopLoading()
+end
+
+function GetWeaponInHands()
+	local wpn = db.actor:item_in_slot(db.actor:active_slot())
+	if (wpn and IsWeapon(wpn) and (not IsMelee(wpn))) then
+		return wpn
+	end
+	
+	return nil
+end
+
+
+local cancelReloadTimer = -1
+
+local reload_Weapon = nil
+local reload_Magazine = nil
+
+local grenadeMode = false
+
+function actor_on_weapon_reload(actor, weapon, ammo_total)
+	
+	local weapon = db.actor:item_in_slot(db.actor:active_slot())
+	local magData = wuut_mags_storage[weapon:id()]
+	
+	-- cancel reload only if we have a valid mag
+	if(system_ini():section_exist(WeaponGetDefaulMagSection(weapon)) == false ) then return end
+
+	--if(flag_weapon_jammed == false) then
+	if not grenadeMode then
+		cancelReloadTimer = 0
+	end
+
+end
+
+function actor_on_weapon_fired(obj, weapon, ammo_elapsed, grenade_elapsed, ammo_type, grenade_type)
+	--print_dbg("actor_on_weapon_fired ")
+	if (obj:id() == AC_ID) then
+		LoadWeapon(weapon, true)
+	end
+end
+-- readies the current weapon to be fired
+function LoadCurrentWeapon()
+	print_dbg("LoadCurrentWeapon")
+	if(grenadeMode) then return -1 end
+	local weapon = db.actor:item_in_slot(db.actor:active_slot())
+	
+	if(weapon == nil or db.actor == nil) then return -1 end
+	
+	if(system_ini():section_exist(WeaponGetDefaulMagSection(weapon)) == false ) then return end
+	
+	printf("LoadCurrentWeapon D2")
+	
+	if (weapon and IsWeapon(weapon) and (not IsMelee(weapon))) then
+		LoadWeapon(weapon, false)
+		printf("LoadCurrentWeapon D3")
+	end
+end
+-- puts a round in the weapon to be fired. feedNextRound 
+function LoadWeapon(weapon, feedNextRound)
+
+	local sec = weapon:section()
+	
+	local id = weapon:id()
+	local wObj = alife_object(id)
+	
+	local data = GetMagStorage(id)
+	
+	local ammo = utils_item.get_ammo(weapon:section(), weapon:id())
+	if (data ~= nil) then
+	
+	end
+	-- feed next round
+	
+	local magData = GetMagStorage(id)
+	
+	local magSlot = magData.slot--magData[iWEP_MSLOT]
+	local magSection = magData.section --magData[iWEP_MSEC]
+	
+	-- make sure we handle valid mag
+	if(magSlot == nil or magSection == nil) then return -1 end
+	
+	if(system_ini():section_exist(magSection) == false) then
+		return -1
+	end
+	
+	local magData_ammoCount = magData.count - 1
+	local magData_ammoRounds = magData.loaded
+	local magData_ammoRounds_Next = pop(magData_ammoRounds)
+	
+	if(feedNextRound == false) then
+		magData_ammoCount = magData_ammoCount + 1
+		magData_ammoRounds_Next = magData_ammoRounds 
+	
+	end
+
+	if(magData_ammoCount > 0) then
+		local nextRound = string.sub(magData_ammoRounds_Next, -1)
+
+		local nextRoundIndex = tonumber(nextRound)
+		
+		-- set next ammo type
+		local ammoType = nextRoundIndex
+		weapon:unload_magazine()
+		weapon:set_ammo_type(ammoType)
+		weapon:set_ammo_elapsed(tonumber(magData[iWEP_COUNT]))
+	end
+	-- update mag data
+	-- dataWeapon = magSlot .. ":" .. magSection .. ":" .. magData_ammoCount .. ":" .. magData_ammoRounds_Next
+	dataWeapon.slot = magSlot
+	dataWeapon.section = magSection
+	dataWeapon.count = magData_ammoCount
+	dataWeapon.loaded = magData_ammoRounds_Next
+
+	SetMagStorage(id, dataWeapon)
+end
+
+
+function CountAmmoBySection(section)
+	
+	local count = 0
+
+	db.actor:inventory_for_each(function (item)
+		if (section == item:section() ) then
+			--ammos[#ammos+1] = item:id()
+			count = count + item:ammo_get_count()
+		end
+	end)
+	print_dbg("CountAmmoBySection " .. section .. " Count: " .. count)
+	
+	return count
+end
+
+local is_loading = false
+local loading_mode = ""
+local timer = 0;
+local lastState = 0
+local stateReload = 7
+local reloading = false
+local lastAmmoIndex = 0
+local lastAmmoCount = 0
+local lastAmmoTable = {}
+local lastSlot = nil
+
+
+function animation_end(item,section,motion,state,slot)	
+	print_dbg("hud_animation_end [%s] sec=%s motion=%s state=%s slot=%s",item and item:name(),section,motion,state,slot)
+
+end
+
+function IsGrenadeMode()
+	print_dbg("IS_GRENADE_MODE ")
+
+	local weapon = db.actor:item_in_slot(db.actor:active_slot())
+	if(weapon) then
+		local currentState = weapon:get_state()
+		if(currentState == 10) then
+			print_dbg("TRUE " .. currentState)
+
+			return true
+		end
+		print_dbg("FALSE " .. currentState)
+		return false
+	end
+	print_dbg("FALSE ")
+	return false
+end
+
+function main_loop()
+	-- checking states
+	if(db.actor) then
+		-- slot stuff
+		local currentSlot = db.actor:active_slot()
+		if(lastSlot ~= currentSlot) then
+			reload_Weapon = nil
+			reload_Magazine = nil
+			print_dbg("ReLOAD RESET weapon")
+			LoadCurrentWeapon()
+		end
+		lastSlot = currentSlot
+	
+		local weapon = db.actor:item_in_slot(db.actor:active_slot())
+		if(reload_Weapon ~= nil) then weapon = reload_Weapon end
+		
+		if (weapon and IsWeapon(weapon) and (not IsMelee(weapon))) then
+			
+			local currentState = weapon:get_state()			
+			if(currentState ~= lastState) then
+				
+				print_dbg("NEW STATE: " .. currentState)
+				
+				if(currentState == 10) then
+					if(grenadeMode == true) then
+						grenadeMode = false
+					else
+						grenadeMode = true
+					end
+				end
+			end
+			if(currentState ~= lastState and currentState == stateReload) then
+			
+				empty_table(lastAmmoTable)
+				
+				local wep_ammos = utils_item.get_ammo(weapon:section(), weapon:id())
+				for i=1,#wep_ammos do
+					local ammo_sec = wep_ammos[i]
+					print_dbg("ammo_sec: " .. ammo_sec)
+					local ammo_count = CountAmmoBySection(ammo_sec)
+					print_dbg("ammo_count: " .. ammo_count)
+					lastAmmoTable[tostring(ammo_sec)] = ammo_count
+				end
+				
+				for ammoType, lastAmmoCount in pairs(lastAmmoTable) do
+					
+					print_dbg("-- ammoType: " .. tostring(ammoType))
+				end
+				
+				print_dbg("Reload: Start")
+				print_dbg("checking states currentState: " .. currentState .. " lastState " .. lastState)
+				
+				reloading = true
+				
+			elseif(currentState ~= lastState and lastState == stateReload and currentState == 0) then
+				
+				print_dbg("Reload: End")
+				print_dbg("checking states currentState: " .. currentState .. " lastState " .. lastState)
+				
+				reloading = false
+				
+				for ammoType, lastAmmoCount in pairs(lastAmmoTable) do
+					
+					print_dbg("-- ammoType: " .. tostring(ammoType))
+				
+					local count = CountAmmoBySection(ammoType)
+					 
+					local ammoRefund = lastAmmoCount - count
+					
+					if(ammoRefund > 0 and reload_Weapon ~= nil) then 
+						create_ammo(ammoType, db.actor:position(), db.actor:level_vertex_id(), db.actor:game_vertex_id(), AC_ID, ammoRefund)
+					end
+				end
+				print_dbg("PROPER ReLOAD Finalize")
+			
+				if(reload_Weapon ~= nil) then
+			
+					local loading_state = WeaponAttemptToLoadMagazine(reload_Weapon, reload_Magazine, true)
+					reload_Weapon = nil
+					reload_Magazine = nil
+				end
+			end
+			
+			lastState = currentState
+		end
+	end
+	
+	if(cancelReloadTimer > -1) then
+		if(cancelReloadTimer == 0) then
+			print_dbg("cancelReloadTimer == 0")
+			
+			local loading_state = false
+			local weapon = db.actor:item_in_slot(db.actor:active_slot())
+			
+			if(flag_weapon_jammed) then
+				if(MagazineInWeaponIsValid(weapon)) then
+					local mag = weapon_eject_mag_functor(weapon)
+					PlayReloadAnimation(weapon)
+				end
+				
+				flag_weapon_jammed = false
+			else
+				-- fake reload with animation
+				local function itr_inv(temp,inv_mag)
+
+					if ( isMagazine(inv_mag) == true and IsMagazineForWeapon(weapon, inv_mag) and string_ends_with(inv_mag:section(), "_ready") ) then 
+						print_dbg("attempting reload " .. inv_mag:section() .. " ID: " .. inv_mag:id())
+						
+						loading_state = WeaponAttemptToLoadMagazine(weapon, inv_mag, false)
+						
+						if(loading_state) then
+							reload_Weapon = weapon
+							reload_Magazine = inv_mag
+							PlayReloadAnimation(weapon)
+							print_dbg("attempting reload Check is OK for " .. inv_mag:section() .. " ID: " .. inv_mag:id())
+							return 0 --do return end-- return
+						end
+						
+					end
+
+				end
+				db.actor:iterate_inventory(itr_inv)
+			
+			end
+			
+			if(loading_state == false) then
+				print_dbg("canceling reload")
+				local weapon = db.actor:item_in_slot(db.actor:active_slot())
+				weapon:switch_state(2)
+			end
+		end
+		cancelReloadTimer = cancelReloadTimer -1
+	
+	end
+	
+	local tg = time_global()
+	
+	if(is_loading) then
+		
+		if(timer < tg) then
+			
+			timer = tg + 400
+			if(loading_mode == "ammo_to_mag") then
+			
+				MagazineAttemptLoadingWithBullets(loading_item1, loading_item2)
+			
+			end
+			
+			if(loading_mode == "mag_to_inv") then
+				MagazineAttemptUnloadBullet(loading_item2)
+
+			end
+		else
+			timer = timer - 1
+		end
+	end
+	return
+end
+
+function MagazineInWeaponIsValid(weapon)
+	
+	local magData = wuut_mags_storage[weapon:id()]
+	
+	local magSection = magData.section
+	
+	-- make sure we have a valid mag string here
+	if(magSection ~= nil and system_ini():section_exist(magSection)) then
+		print_dbg("MagazineInWeaponIsValid " .. magSection )
+	
+		return true
+	end
+	
+	return false
+end
+
+function weapon_eject_mag_precondition(weapon)
+	
+	print_dbg("weapon_eject_mag_precondition")
+
+	--check if there is a valid mag in weapon
+	if (weapon and IsWeapon(weapon) and (not IsMelee(weapon))) then
+		
+		print_dbg("weapon_eject_mag_precondition1")
+		
+		if(MagazineInWeaponIsValid(weapon)) then
+		
+			printf("MagazineInWeaponIsValid")
+			
+			return game.translate_string("st_mag_eject_magazine")
+		end
+	end
+end
+
+function weapon_eject_mag_functor(weapon)
+
+	local magData = wuut_mags_storage[weapon:id()]
+	if not magData then return end -- don't wanna eject nil mags
+	local magSlot = magData.slot--magData[iWEP_MSLOT]
+	local magSection = magData.section-- magData[iWEP_MSEC]
+	local ammoCount = #magData.loaded
+	local ammoFill = magData.loaded
+
+	-- empty magazine
+	WeaponSetMagData(weapon, nil)
+	weapon:unload_magazine()
+	weapon:set_ammo_elapsed(0)
+	
+	-- create magazine in inventory
+	local mag = alife_create_item(magSection, db.actor)
+	
+	local data = GetMagStorage(mag.id) 
+	-- data = magSlot .. ":" .. ammoCount .. ":" .. ammoFill
+	data.slot = magSlot
+	data.loaded = ammoFill
+	print_dbg("weapon_eject_mag_functor create mag " .. data)
+	SetMagStorage(mag.id, data)
+	if(MAGAZINE_CALCULATE_WEIGHT) then
+		CreateTimeEvent("delayed_weight_calc", "delayed_weight_calc", 1, delayed_weight_calc, mag.id)
+	end
+	
+	return mag
+end
+
+function delayed_weight_calc(id)
+	local itm = id and level.object_by_id(id)
+	if (itm) then
+		MagazineCalculateWeight(itm)
+		return true
+	end
+	return false
+end
+
+function mag_unload_ammo_precondition(item)
+
+	local is_mag = isMagazine(item)
+	
+	if(is_mag) then
+		
+		local magData = wuut_mags_storage[item:id()]
+		
+		if(magData and #magData.loaded > 0) then
+			
+			return game.translate_string("st_mag_unload_ammo") .. " (" .. #magData.loaded .. ")"
+		end	
+	end
+end
+
+function mag_unload_ammo_functor(weapon)
+	
+	print_dbg("unload_mag_functor")
+	
+	StopLoading()
+	
+	is_loading = true
+	loading_item1 = nil
+	loading_item2 = weapon
+	loading_mode = "mag_to_inv"
+end
+
+function GetMagazineSlot(item)
+	
+	local magData = WeaponGetMagData(item)
+	return magData.slot
+end
+
+function GetNextAvailableMagazineSlotFor(item)
+	if(isMagazine(item)) then
+	
+		local mag_limit_small = 0
+		local mag_limit_medium = 0
+		local mag_limit_large = 0
+
+	
+		local magCountSmall = 0
+		local magCountMedium = 0
+		local magCountLarge = 0
+		
+		-- get the slot limits for our outfit
+		local outfit = db.actor:item_in_slot(7)
+		
+		if(outfit == nil) then
+			mag_limit_small = system_ini():r_u32("wlc_none", "mag_limit_small")
+			mag_limit_medium = system_ini():r_u32("wlc_none", "mag_limit_medium")
+			mag_limit_large = system_ini():r_u32("wlc_none", "mag_limit_large")
+		else
+		
+			local outfitType = system_ini():r_string_ex(outfit:section(), "kind")
+			
+			-- see if we have a specific outfit config
+			if(system_ini():section_exist("wlc_" .. outfit:section())) then
+				mag_limit_small = system_ini():r_u32("wlc_" .. outfit:section(), "mag_limit_small")
+				mag_limit_medium = system_ini():r_u32("wlc_" .. outfit:section(), "mag_limit_medium")
+				mag_limit_large = system_ini():r_u32("wlc_" .. outfit:section(), "mag_limit_large")
+			else -- we don't load default values
+			
+				local outfitSectionDefault = ""
+			
+				if(outfitType == "o_light") then
+					outfitSectionDefault = "wlc_light"
+				elseif(outfitType == "o_medium") then
+					outfitSectionDefault = "wlc_medium"
+				elseif(outfitType == "o_heavy") then
+					outfitSectionDefault = "wlc_heavy"
+				elseif(outfitType == "o_sci") then
+					outfitSectionDefault = "wlc_sci"
+				end
+				
+				print_dbg("outfitSectionDefault " .. outfitSectionDefault)
+				
+				mag_limit_small = system_ini():r_u32(outfitSectionDefault, "mag_limit_small")
+				mag_limit_medium = system_ini():r_u32(outfitSectionDefault, "mag_limit_medium")
+				mag_limit_large = system_ini():r_u32(outfitSectionDefault, "mag_limit_large")
+				
+			end
+		
+		end
+		
+		local function itr_inv(temp, inv_mag)
+		
+			if ( isMagazine(inv_mag) == true ) then 
+					
+					local magSlot = GetMagazineSlot(inv_mag)
+					
+					if (magSlot == "S" and string_ends_with(inv_mag:section(), "_ready")) then
+						magCountSmall = magCountSmall + 1
+						
+					elseif (magSlot == "M" and string_ends_with(inv_mag:section(), "_ready")) then
+						magCountMedium = magCountMedium + 1
+						
+					elseif (magSlot == "L" and string_ends_with(inv_mag:section(), "_ready")) then
+						magCountLarge = magCountLarge + 1
+						
+					end
+			end
+		end
+		db.actor:iterate_inventory(itr_inv)
+		
+		print_dbg("mags found: " .. magCountSmall .. " - " .. magCountMedium)
+		
+		local mag_size = ini_sys:r_string_ex(item:section(),"mag_size",false)
+		
+		local nextAvailableSlot = "N"
+		
+		--check space in small pouches (for small mags only)
+		if (nextAvailableSlot == "N" and magCountSmall < mag_limit_small and mag_size == "small") then
+			nextAvailableSlot = "S"
+			return nextAvailableSlot
+		end
+		--check space in medium pouches (for small and medium mags)
+		if (nextAvailableSlot == "N" and magCountMedium < mag_limit_medium and (mag_size == "small" or mag_size == "medium") ) then
+			nextAvailableSlot = "M"
+			return nextAvailableSlot
+		end
+		--check space in large pouches (for small and medium and large mags)
+		if (nextAvailableSlot == "N" and magCountLarge < mag_limit_large and (mag_size == "small" or mag_size == "medium" or mag_size == "large") ) then
+			nextAvailableSlot = "L"
+			return nextAvailableSlot
+		end
+		
+		-- return default "N"
+		return nextAvailableSlot
+	end
+end
+
+
+function add_mag_to_loadout_precondition(item)
+	local parent = item:parent()
+	if not (parent and parent:id() == AC_ID) then 
+		return 
+	end
+	--print_dbg("add_mag_to_loadout_precondition")
+
+	if(isMagazine(item)) then
+	
+		local magData = WeaponGetMagData(item)
+		local magSlot = magData[iMAG_SLOT]
+		local nextSlot = GetNextAvailableMagazineSlotFor(item)
+		
+		--
+		if( string_ends_with(item:section(), "_ready")) then
+			--return "remove (" .. magSlot .. ")"
+			return game.translate_string("st_mag_loadout_remove") .. " (" .. magSlot .. ")"
+			
+		elseif(nextSlot ~= "N") then
+			--return "add to loadout (" .. nextSlot .. ")"
+			return game.translate_string("st_mag_loadout_add") .. " (" .. nextSlot .. ")"
+			
+		end
+
+	end
+end
+
+function add_mag_to_loadout_functor(item)
+	
+	local nextSlot = GetNextAvailableMagazineSlotFor(item)
+	local magData = WeaponGetMagData(item)
+	local ammoCount = tonumber(magData[iMAG_COUNT])
+	local ammoFill = magData[iMAG_FILL]
+	
+	local newMagSec = ""
+	
+	local equipped = false
+	if( string_ends_with(item:section(), "_ready")) then
+		newMagSec = string.gsub(item:section(), "%_ready", "")
+	else
+		newMagSec = item:section() .. "_ready"
+	end
+	
+	print_dbg("newMagSec " .. newMagSec)
+	
+	
+	if(system_ini():section_exist(newMagSec)) then
+	
+		-- kill old mag
+		alife_release_id(item:id())
+		SetMagStorage(item:id(), nil)
+		
+		-- make new one
+		local newMag = alife_create_item(newMagSec, db.actor)
+		local data = GetMagStorage(newMag.id) --utils_stpk.get_weapon_data(newMag)
+		-- transfer mag data
+		data = nextSlot .. ":" .. ammoCount .. ":" .. ammoFill
+		SetMagStorage(newMag.id, data) -- utils_stpk.set_weapon_data(data, newMag)
+		
+	end
+end
+
+function isMagazine(item)
+
+	local is_mag = SYS_GetParam(1, item:section(), "is_mag")
+	if is_mag then return is_mag else return false 
+end
+
+function StopLoading()
+	is_loading = false
+	loading_item1 = nil
+	loading_item2 = nil
+
+end
+
+
+function MagazineAttemptUnloadBullet(magazine)
+
+	local magData = WeaponGetMagData(magazine)
+	local magSlot = magData[iMAG_SLOT]
+	local currentAmmoCount = tonumber(magData[iMAG_COUNT])
+	local ammoFill = magData[iMAG_FILL]
+
+
+	if( currentAmmoCount > 0 ) then
+		
+		-- get last bullet
+		local nextRound = string.sub(ammoFill, -1)
+		local nextRoundIndex = tonumber(nextRound)
+		local ammoType = GetAmmoTypeByIndex(magazine, nextRoundIndex)
+		
+		print_dbg("MagazineAttemptUnloadBullet creating " .. ammoType)
+		
+		-- update ammo count and fill
+		local magData_ammoRounds_Next = string.sub(ammoFill,1,-2)
+		
+		WeaponSetMagData(magazine, magSlot .. ":" .. currentAmmoCount -1 .. ":" .. magData_ammoRounds_Next)
+		
+		if(MAGAZINE_CALCULATE_WEIGHT) then
+			MagazineCalculateWeight(magazine)
+		end
+		
+		--magData.custom_data = "" .. currentAmmoCount -1 .. ":" .. magData_ammoRounds_Next
+		--utils_stpk.set_weapon_data(magData,magazine)
+		
+		-- create according round in inventory
+		create_ammo(ammoType, db.actor:position(), db.actor:level_vertex_id(), db.actor:game_vertex_id(), AC_ID, 1)
+		
+		UpdateMagazineUI(magazine)
+		
+	else
+		StopLoading()
+	end
+
+end
+
+function MagazineCalculateWeight(magazine)
+	local mag_weight_empty = system_ini():r_float_ex(magazine:section(), "inv_weight")
+
+	local magData = WeaponGetMagData(magazine)
+	local magSlot = magData.slot
+	local currentAmmoCount = #magData.loaded
+	local ammoFill = magData.loaded
+
+	for i = 1, #ammoFill do
+		local index = ammoFill:sub(i,i)
+		
+		local ammoType = GetAmmoTypeByIndex(magazine, tonumber(index))
+		local box_size = system_ini():r_float_ex(ammoType, "box_size")
+		local box_weight = system_ini():r_float_ex(ammoType, "inv_weight")
+		local cartridge_weight = box_weight / box_size
+		
+		mag_weight_empty = mag_weight_empty + cartridge_weight
+		
+	end
+	
+	magazine:set_weight(mag_weight_empty)
+	
+end
+
+function MagazineAttemptLoadingWithBullets(item, magazine)
+
+	local magData = WeaponGetMagData(magazine)
+	local magSlot = magData[iMAG_SLOT]
+	local currentAmmoCount = tonumber(magData[iMAG_COUNT])
+	local ammoFill = magData[iMAG_FILL]
+	local ammoIndex = GetAmmoIndexBySection(magazine:section(), item:section()) - 1
+
+	--madgamer98 - wuut I've passed these along as a gloabl variable so that the inventory loop function can use them later
+	ammoName = item:section()
+	ammoId = item:id()
+	true_ammo_box_size = 0
+	-- end added code madgamer98
+	local ammo_box_size = item:ammo_get_count()
+
+	local wpn_ammo_max = system_ini():r_u32(magazine:section(), "max_mag_size")
+
+	local check = IsAmmoForMagazine(magazine, item) and currentAmmoCount < wpn_ammo_max
+
+	print_dbg("currentAmmoCount: " .. currentAmmoCount)
+	print_dbg("ammoIndex: " .. ammoIndex)
+	print_dbg("ammoFill: " .. ammoFill)
+
+	ammoFill = ammoFill .. ammoIndex
+
+	if(ammoIndex == -1) then check = false end
+
+	if(check) then
+			
+		-- Update ammo box count
+		item:ammo_set_count(ammo_box_size - 1)
+
+		WeaponSetMagData(magazine, magSlot .. ":" .. currentAmmoCount + 1 .. ":" .. ammoFill)
+		
+		if(MAGAZINE_CALCULATE_WEIGHT) then
+			MagazineCalculateWeight(magazine)
+		end
+		xr_sound.set_sound_play(AC_ID,"reload_shell")
+		-- remove empty ammo
+		if ((ammo_box_size - 1) == 0 ) then
+
+			--madgamer98 - hey wuut this here is the calling the function below to search through the players inventory right as the ammo runs out
+			if (db.actor) then
+				local npc = db.actor
+				npc:iterate_inventory(grab_inv_items, npc)
+			end
+			--end added code madgamer98
+			local ammo_box_object = alife_object(item:id())
+			alife():release(ammo_box_object, true)
+			
+			StopLoading()
+
+			--madgamer98 - wuut this if statement checks if you still have more ammo in your inventory through the variable set ealier when we lopped through the inventory If you do have more ammo it sets up the main loops to run again with the new ammo selected and the old magazine that was being loaded. This allows it to continue loading after one of the ammo boxes gets consumed/deleted if you still have remaining ammo loadable
+			if ((true_ammo_box_size) ~= 0) then
+				is_loading = true
+				loading_item1 = newAmmo
+				loading_item2 = magazine
+				loading_mode = "ammo_to_mag"
+			end
+			--end added code madgamer98
+		end
+		
+		UpdateMagazineUI(magazine)
+	
+	else
+		StopLoading()
+	end
+end
+
+--madgamer98 - wuut function to go through the inventory grab another ammo box that has the same name as the one currently being loaded and grabbing the ammo count of all of them as well as a single id of the same ammo type
+function grab_inv_items(npc, item)
+	local isAmmo = IsAmmo(item)
+
+	if(isAmmo) then 
+		print_dbg("ammo: " .. item:section())
+		if(ammoName == item:section()) then
+			true_ammo_box_size = true_ammo_box_size + item:ammo_get_count()
+			print_dbg("ammo-size: " .. true_ammo_box_size)
+			if (ammoId ~= item:id()) then
+				newAmmo = item
+			end
+		end
+	end
+end
+
+--end added code madgamer98
+function GetAmmoTypeByIndex(item, index)
+
+	local ammo = parse_list(system_ini(),item:section(),"mag_ammo_class")
+
+	return ammo[index + 1]
+
+end
+
+-- match to index
+function GetAmmoIndexBySection(item_section, ammo_section)
+
+	print_dbg("GetAmmoIndexBySection " .. item_section .. " - " .. ammo_section)
+
+	local ammo = parse_list(system_ini(),item_section,"mag_ammo_class")
+	if ammo and #ammo > 1 then
+		for i=1,#ammo do
+			if(ammo[i] == ammo_section) then
+				return i
+			end
+		end
+	end
+	return -1
+end
+
+function IsAmmoForMagazine(weapon_mag, ammo_box)
+
+	local ammos = parse_list(system_ini(),weapon_mag:section(),"mag_ammo_class",true)
+	if (ammos[ammo_box:section()]) then 
+		return true 
+	end
+	return false
+end
+
+function DEBUG_PrintAmmoClass(ammo)
+	if ammo and #ammo > 1 then
+		for i=1,#ammo do
+			local sec_ammo = ammo[i]
+			
+			print_dbg("" .. sec_ammo)
+		end
+	end
+end
+
+function IsMagazineForWeapon(weapon, magazine)
+	local weaponBase = SYS_GetParam(0, weapon:section(), "parent_section")
+	
+	local mag_ammos = parse_list(system_ini(),magazine:section(),"mag_ammo_class")
+	
+	local wep_ammos = utils_item.get_ammo(weapon:section(), weapon:id())
+	
+	-- todo have this be dynamically constructed from separate ltx
+	local magazine_group = parse_list(system_ini(),magazine:section(),"magazine_group",true)
+	if (magazine_group[weaponBase] and mag_ammos[1] == wep_ammos[1]) then 
+		return true 
+	end
+	
+	return false
+end
+
+function WeaponAttemptToLoadMagazine(weapon, mag, properReload)
+
+	-- validate weapon
+	if (weapon and IsWeapon(weapon) and (not IsMelee(weapon))) then
+	
+		-- validate mag
+		if(IsMagazineForWeapon(weapon, mag)) then
+			
+			-- only load magazines that are not empty
+			local magData = WeaponGetMagData(mag)
+			if(#magData.loaded == 0) then return false end
+			
+			-- eject mag if necessary also only on preper reload
+			if(MagazineInWeaponIsValid(weapon) and properReload) then
+			
+				weapon_eject_mag_functor(weapon)
+				
+			end
+			
+			if(properReload) then
+				-- get mag data
+				local magData = WeaponGetMagData(mag)
+				local magSlot = magData[iMAG_SLOT]
+				local ammoCount = tonumber(magData[iMAG_COUNT])
+				local ammoFill = magData[iMAG_FILL]
+				
+				WeaponSetMagData(weapon, magSlot .. ":" .. mag:section()  .. ":" .. ammoCount .. ":" .. ammoFill)
+				
+				-- adjust ammo type and load weapon
+				local nextRound = string.sub(ammoFill, -1)
+				local nextRoundIndex = tonumber(nextRound)
+				local ammoType = GetAmmoTypeByIndex(mag, nextRoundIndex)
+				weapon:unload_magazine()
+				weapon:set_ammo_type(nextRoundIndex)
+				weapon:set_ammo_elapsed(ammoCount)
+				
+				-- remove magazine from inventory
+				alife_release_id(mag:id())
+				SetMagStorage(mag:id(), nil)
+			end
+			return true
+		end
+	end
+	return false
+end
+
+
+function PlayReloadAnimation(weapon)
+
+	print_dbg("PlayReloadAnimation")
+
+	weapon:switch_state(stateReload)
+end
+
+local weaponTemp = nil
+
+function on_item_drag_dropped(item, weapon, from_slot, to_slot)
+
+	print_dbg("on_item_drag_dropped " .. item:section() .. " on " .. weapon:section() .. " to_slot " .. to_slot)
+
+	-- Check capability
+	if not (from_slot == EDDListType.iActorBag and (to_slot == EDDListType.iActorBag or to_slot == EDDListType.iActorSlot ) ) then
+        return
+    end
+	
+	if(item:id() == weapon:id()) then
+		return
+	end
+
+	if(IsAmmo(item) and isMagazine(weapon)) then
+	
+		if(is_loading) then
+			StopLoading()
+		end
+	
+		is_loading = true
+		loading_item1 = item
+		loading_item2 = weapon
+		loading_mode = "ammo_to_mag"
+	
+	else
+		StopLoading()
+	end
+	
+	local stateLessReload = false
+	
+	
+	if(from_slot == EDDListType.iActorBag and to_slot == EDDListType.iActorBag) then
+	
+		stateLessReload = true
+
+	end
+	
+	if(from_slot == EDDListType.iActorBag and to_slot == EDDListType.iActorSlot) then 
+	
+		local activeWeapon = GetWeaponInHands()
+	
+		if(activeWeapon ~= nil and activeWeapon:id() == weapon:id()) then
+			stateLessReload = false
+		else
+			stateLessReload = false
+		end
+
+	end
+	if(stateLessReload) then
+		
+		print_dbg("STATELESSRELOAD TRUE")
+		
+		local loading_state = WeaponAttemptToLoadMagazine(weapon, item, true)
+		
+		if(loading_state) then
+			PlayReloadAnimation(weapon)
+		end
+	
+	else
+		print_dbg("STATELESSRELOAD FALSE")
+		
+		-- mag dropped on weapon
+		local loading_state = WeaponAttemptToLoadMagazine(weapon, item, false)
+		if(loading_state) then
+			reload_Weapon = weapon
+			reload_Magazine = item
+			PlayReloadAnimation(weapon)
+			print_dbg("(2) attempting reload Check is OK for " .. item:section() .. " ID: " .. item:id())
+		end
+	end
+end
+
+function WeaponGetDefaulMagSection(weapon)
+
+	-- assemble magazine section from weapon section and calibre section
+	-- local weaponSection = weapon:section()
+
+	-- local weaponBaseParts = str_explode(weapon:section(),"_")
+
+	-- if(weaponBaseParts[1] == nil or weaponBaseParts[2] == nil) then return "invalid_weapon" end
+	local weaponSection = SYS_GetParam(2, weapon:section(), "parent_section")
+
+	-- local weaponBase = weaponBaseParts[1] .. "_" .. weaponBaseParts[2]
+	local ammo = utils_item.get_ammo(weapon:section(), weapon:id())
+	
+	-- Check for corrupted weapons
+	
+	if(ammo[1] ~= nil) then
+	
+		local ammoName = string.gsub(ammo[1], "%ammo_", "")
+		local defaultMagSection = "mag_" .. weaponBase .. "_" .. ammoName
+
+		return defaultMagSection	
+	else
+		print_dbg( "corrupted_weapon: " .. weaponSection )
+		return "corrupted_weapon"
+	end
+
+end
+
+function on_item_focus(item)
+	
+	print_dbg("on_item_focus")
+	
+	local validItem = false
+	
+	local isMag = isMagazine(item)
+	local isWep = IsWeapon(item)
+	local isAmmo = IsAmmo(item)
+	
+	if(isMag or isWep or isAmmo) then 
+		validItem = true
+	end
+	
+	if(not validItem) then return end
+	
+	--TODO: reiplement later
+	
+	--[[
+	if(isMagazine(item)) then 
+		-- Highlight all weapons for this magazine.
+		local weapons = alun_utils.parse_list(system_ini(), item:section(), "compatible_weapons")
+		local inventory = ActorMenu.get_actor_menu()
+		if not (weapons or (inventory and inventory:IsShown())) then return end
+		for i=1,#weapons do 
+			inventory:highlight_section_in_slot(weapons[i],EDDListType.iActorBag)
+		end
+	end
+	]]
+	
+	-- update weapon without magazine but with bullets
+	local magData = wuut_mags_storage[item:id()]
+	
+	if(magData == nil) then return -1 end
+	
+	local validMagIsInWeapon = false
+	
+	if( magData[iWEP_MSEC] ~= nil and system_ini():section_exist(magData[iWEP_MSEC])) then
+		validMagIsInWeapon = true
+	end
+	
+	local defaultMagSection = WeaponGetDefaulMagSection(item)
+	local defaultMagSectionExists = system_ini():section_exist(defaultMagSection)
+	
+	if (item and IsWeapon(item) and (not IsMelee(item)) and validMagIsInWeapon == false ) then
+		if(defaultMagSectionExists and magData[iWEP_MSEC] ~= "no_mag") then
+			
+			print_dbg("mag section found: " .. defaultMagSection)
+			
+			local obj = alife_object(item:id())
+			-- check mag capacity, or default
+			local maxAmmo = item:get_ammo_in_magazine()
+			
+			local ammoIndex = item:get_ammo_type()
+			
+			local ammoFill = ""
+			
+			for i = 1,maxAmmo,1 
+			do 
+			   ammoFill = ammoFill .. "" .. ammoIndex
+			end
+		
+			if(maxAmmo == 0) then
+				defaultMagSection = "no_mag" -- no mag
+			end
+		
+			WeaponSetMagData(item, "N:" ..  defaultMagSection .. ":" .. maxAmmo .. ":" .. ammoFill)	
+		else
+		
+			print_dbg("ERROR: mag section invalid: " .. defaultMagSection)
+			
+		end
+	end
+	
+	print_dbg("D1")
+		
+	if(defaultMagSectionExists) then
+		print_dbg("UNLOADING")
+	
+		-- unload weapon to get rid of the "unload" button
+		item:unload_magazine()
+		--weapon:set_ammo_type(ammo_type)
+		item:set_ammo_elapsed(0)
+		
+	end
+	
+	print_dbg("D2")
+	UpdateMagazineUI(item)
+	print_dbg("D3")
+end 
+
+function AmmoWheel_GetMagazineListAndLoad(weapon, loadAndReturn)
+
+	print_dbg("AmmoWheel_GetMagazineListAndLoad " .. loadAndReturn)
+
+	local ammo_inv = {}
+
+	local function itr_inv(temp,inv_mag)
+
+		if ( isMagazine(inv_mag) == true and IsMagazineForWeapon(weapon, inv_mag) and string_ends_with(inv_mag:section(), "_ready") ) then 
+			print_dbg("attempting reload " .. inv_mag:section() .. " ID: " .. inv_mag:id())			
+			local magData = wuut_mags_storage[inv_mag:id()]
+			
+			local magFill = magData[iMAG_FILL]
+			
+			local magCount = tonumber(magData[iMAG_COUNT])
+			
+			if(magCount > 0) then
+			
+				local firstRoundIndex = tonumber(string.sub(magFill, 1, 1))
+				local ammoSec = GetAmmoTypeByIndex(inv_mag, firstRoundIndex)
+			
+				if(loadAndReturn ~= -1) then
+					
+					if(firstRoundIndex == loadAndReturn - 1) then
+						-- attempt to load mag here
+						local loading_state = WeaponAttemptToLoadMagazine(weapon, inv_mag, false)
+						
+						if(loading_state) then
+							reload_Weapon = weapon
+							reload_Magazine = inv_mag
+							PlayReloadAnimation(weapon)
+							print_dbg("attempting reload Check is OK for " .. inv_mag:section() .. " ID: " .. inv_mag:id())
+							
+							return 0
+						end
+					end
+				else
+					ammo_inv[ammoSec] = (ammo_inv[ammoSec] or 0) + 1
+				end
+			end
+			
+		end
+
+	end
+	
+	db.actor:iterate_inventory(itr_inv)
+	
+	return ammo_inv
+end
+
+
+function UpdateMagazineUI(item)
+
+	if(grenadeMode) then return -1 end
+
+	printf("UpdateMagazineUI:isMagazine" )
+
+	if(isMagazine(item)) then
+	
+		printf("ValidateMag" )
+	
+		ValidateMag(item)
+	
+		if(MAGAZINE_CALCULATE_WEIGHT) then
+			MagazineCalculateWeight(item)
+		end
+		local currentMag = wuut_mags_storage[item:id()]
+		
+		local curretnAmmoCount = tonumber(currentMag[iMAG_COUNT])
+		if (curretnAmmoCount == nil) then return -1 end
+		local wpn_ammo_max = system_ini():r_u32(item:section(), "max_mag_size")
+		printf("curretnAmmoCount: " .. tostring(curretnAmmoCount))
+	
+		new_condition = curretnAmmoCount / wpn_ammo_max
+	
+		--print_dbg(tostring(new_condition))
+	
+		item:set_condition(new_condition)
+		
+		if(ui_inventory.GUI and ui_inventory.GUI.CC["picker"]) then
+			--printf("ui_inventory.GUI.CC[]")
+			if(ui_inventory.GUI.CC["picker"]:IsShown()) then
+				ui_inventory.GUI.CC["picker"]:UpdateItem(item, nil)
+			end
+		end
+		local ammo = parse_list(system_ini(),item:section(),"mag_ammo_class")
+		
+		
+		local inventory = ActorMenu.get_actor_menu()
+		if not ((#ammo > 0) or (inventory and inventory:IsShown())) then return end
+		for i=1,#ammo do 
+			inventory:highlight_section_in_slot(ammo[i],EDDListType.iActorBag)
+		end
+	
+	end
+	
+end
+function ValidateMag(mag)
+	
+	local id = mag:id()
+	local wObj = alife_object(id)
+	
+	local data = GetMagStorage(id) --utils_stpk.get_weapon_data(wObj)
+	
+	printf("ValidateMag old data: " .. tostring(data) .. " - ")
+
+	if(data == "" or nil) then
+		
+		printf("ValidateMag Set new data N:0:")
+		
+		WeaponSetMagData(mag, "N:0:")
+	end
+end
+
+function WeaponSetMagData(weapon, magClass)
+
+	print_dbg("WeaponSetMagData " .. magClass)
+
+	local wObj = alife_object(weapon:id())
+	local data = GetMagStorage(weapon:id())
+	data = magClass
+	SetMagStorage(weapon:id(), data) 
+		
+end
+
+-- function WeaponGetMagData(weapon)
+	
+-- 	print_dbg("WeaponGetMagData: (" .. weapon:section() .. ") ID: " .. weapon:id())
+
+-- 	local data = GetMagStorage(weapon:id()) --utils_stpk.get_weapon_data(wObj)
+	
+-- 	print_dbg("WeaponGetMagData: (" .. tostring(data) .. ")")
+-- 	if(data == nil) then return nil end
+-- 	return str_explode(data,":")
+-- end
+
+function wuut_npc_on_death_callback(npc,who)
+	update_inventory(npc, false)
+end
+
+function update_inventory(npc, is_trader)
+	local function search(temp, item)
+		if (item and IsWeapon(item) and (not IsMelee(item))) then
+			--print_dbg("DEATH: " .. item:section())
+			local defaultMagSection = WeaponGetDefaulMagSection(item)
+			if( system_ini():section_exist(defaultMagSection)) then
+				
+				local npc_id = npc:id()
+				local createItem = false
+				if( is_trader ) then
+					local count = 0
+					
+					local function search_pop(temp, item2)
+						--print_dbg("DEATH: " .. item:section())
+						if(defaultMagSection == item2:section()) then
+							count = count + 1
+						end
+						
+					end
+					npc:iterate_inventory(search_pop, nil)
+					
+					if(count == 0 ) then
+						createItem = true
+					end
+				end
+				
+				if(createItem or is_trader == false) then
+					local mag = alife_create_item(defaultMagSection, npc)
+				
+				end
+			end
+		end
+	end
+	npc:iterate_inventory(search, nil)
+end
+
+function wuut_OnTrdWndOpened()
+	local npc = extended_mags.GetTalkingNpc()
+	if(extended_mags.IsTrader(npc)) then
+		update_inventory(npc, true)
+	end
+end
+	
+function is_in_slot(obj)
+	for k,_ in pairs(SCANNED_SLOTS) do
+		local item = db.actor:item_in_slot(k)
+		if (item and item:id() == obj:id()) then 
+			return true
+		end
+	end
+	return false
+end
+
+function getMagazineInfo(mag)
+	
+	ValidateMag(mag)
+	
+	local magData = wuut_mags_storage[mag:id()]
+	local ammoTotalCount = tonumber(magData[iMAG_COUNT])
+	local ammoFill = magData[iMAG_FILL]
+	local result = {
+		["compatibleWeapons"] = str_explode(system_ini():r_string_ex(mag:section(), "magazine_group"),","),
+		["ammoMax"] = system_ini():r_u32(mag:section(), "max_mag_size"),
+		["ammoTotalCount"] = ammoTotalCount,
+		["ammoFill"] = {}
+	}
+	
+	if ammoTotalCount > 0 then
+		local ammoIndex
+		local counter = {
+			["ammoIndex"] = tonumber(string.sub(ammoFill, -1)),
+			["count"] = 0
+		}
+
+		while ammoFill ~= '' do
+			ammoIndex = tonumber(string.sub(ammoFill, -1))
+			ammoFill = string.sub(ammoFill, 1, -2)
+
+			if counter.ammoIndex == ammoIndex then
+				counter.count = counter.count + 1
+			end
+
+			if counter.ammoIndex ~= ammoIndex or ammoFill == '' then
+				table.insert(result.ammoFill, {
+					["section"] = GetAmmoTypeByIndex(mag, counter.ammoIndex),
+					["count"] = counter.count
+				})
+
+				counter.ammoIndex = ammoIndex
+				counter.count = 1
+			end
+		end
+	end
+
+	return result
+
+end

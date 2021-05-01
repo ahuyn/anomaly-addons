@@ -1,0 +1,121 @@
+-- utility functions related to magazines that shouldn't clutter main mags script
+gc = game.translate_string
+-- MP for ejecting mags on upgrade/replacement
+DisassemblyWeapon = item_parts.disassembly_weapon
+function item_parts.disassembly_weapon(obj, obj_d) 
+	
+	if(wuut_mags.MagazineInWeaponIsValid(obj)) then
+		local mag = wuut_mags.weapon_eject_mag_functor(obj)
+	end
+	DisassemblyWeapon(obj, obj_d)
+end
+
+WorkshopUpgrade = ui_workshop.UIWorkshopUpgrade.Upgrade
+function ui_workshop.UIWorkshopUpgrade:Upgrade()
+	local obj = self.CC:GetCell_Selected(true)
+	if (not obj) then
+		return
+	end
+	
+	-- For weapons, unload mag and clear ammo cache in case of ammo type upgrades
+	if IsWeapon(obj) and (not IsItem("fake_ammo_wpn",obj:section())) then
+		--artifax fix
+		if(wuut_mags.MagazineInWeaponIsValid(obj)) then
+			local mag = wuut_mags.weapon_eject_mag_functor(obj)
+		end
+	end
+	WorkshopUpgrade(self)
+end
+
+
+local clr_g  = utils_xml.get_color("d_green")
+local clr_2  = utils_xml.get_color("ui_gray_1")
+-- MP for building headers for outfits w. mags, and weapons to show loaded magazine
+
+-- MP for building footers for magazines
+BuildFooter = ui_item.build_desc_footer 
+
+function ui_item.build_desc_footer(obj, sec, str)
+
+	str = BuildFooter(obj, sec, str)
+	local _str = ""
+	if obj and wuut_mags and wuut_mags.isMagazine(obj) then
+		local magInfo = wuut_mags.getMagazineInfo(obj)
+		
+		
+		local weaponTitle
+		local compatibleWeaponsStr = ''
+
+		if table.getn(magInfo.compatibleWeapons) > 1 then
+			for i, weaponSection in ipairs(magInfo.compatibleWeapons) do
+				-- printf("trans weaponSection: " .. weaponSection)
+				weaponTitle = gc(ini_sys:r_string_ex(weaponSection,"inv_name"))
+
+				if weaponTitle then
+					compatibleWeaponsStr = compatibleWeaponsStr .. ' ' .. weaponTitle
+					if i < table.getn(magInfo.compatibleWeapons) then
+						compatibleWeaponsStr = compatibleWeaponsStr .. ','
+					end
+				else
+				end
+			end
+		end
+		if compatibleWeaponsStr ~= '' then
+			local compatibleWeaponsTitle = gc('mag_compatible_weapons')
+
+			_str = _str .. " " .. compatibleWeaponsTitle .. ":" .. clr_2 .. compatibleWeaponsStr
+		end
+		
+		local ammoCountTitle = gc('mag_ammo_loaded_count')
+
+		_str = _str .. " \\n \\n" .. ammoCountTitle .. ": " .. clr_g .. magInfo.ammoTotalCount  .. clr_2 .. " / " .. clr_g .. magInfo.ammoMax .. " \\n"
+
+		if magInfo.ammoTotalCount > 0 then
+			_str = _str .. " \\n"
+			
+			local ammoTitle
+			
+			for i, ammo in ipairs(magInfo.ammoFill) do
+				ammoTitle = gc(ini_sys:r_string_ex(ammo.section,"inv_name"))
+				_str = _str ..'  ' .. clr_g .. ammo.count .. '  ' .. clr_2 .. ammoTitle .. " \\n"
+			end			
+		end
+	end
+	str = _str .. str
+	return str
+end
+
+function GetTalkingNpc()
+	--log("~GetTalkingNpc:->:tData.oNpc:clsid() == clsid.script_trader")
+	for k,v in pairs(db.storage) do
+		local oNpc = v.object
+		if oNpc ~= nil then
+			if oNpc:is_talking() and oNpc:id() ~= AC_ID then
+				return oNpc
+			end
+		end
+	end
+end
+
+function IsTrader(npc)
+	local st = db.storage[npc:id()]
+	if st.is_trader == nil then
+		local trader = false
+		if npc:character_community() == "trader" or npc:clsid() == clsid.script_trader or npc:clsid() == clsid.trader then
+			trader = true
+		end
+		if string.find(npc:section(),"trader") then
+			trader = true
+		end
+		local cini = db.storage[npc:id()].ini
+		local logic = db.storage[npc:id()].section_logic
+		if not logic and not trader then
+			return false
+		end
+		if cini and logic and cini:section_exist(logic) and cini:line_exist(logic,"trade") then
+			trader = true
+		end
+		st.is_trader = trader
+	end
+	return st.is_trader == true
+end
