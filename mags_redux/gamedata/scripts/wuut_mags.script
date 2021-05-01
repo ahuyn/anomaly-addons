@@ -1257,9 +1257,7 @@ function UpdateMagazineUI(item)
 		local wpn_ammo_max = system_ini():r_u32(item:section(), "max_mag_size")
 		printf("curretnAmmoCount: " .. tostring(curretnAmmoCount))
 	
-		new_condition = curretnAmmoCount / wpn_ammo_max
-	
-		--print_dbg(tostring(new_condition))
+		new_condition = curretnAmmoCount / wpn_ammo_max)
 	
 		item:set_condition(new_condition)
 		

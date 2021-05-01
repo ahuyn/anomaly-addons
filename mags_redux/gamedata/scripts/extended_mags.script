@@ -56,7 +56,6 @@ function ui_item.build_desc_footer(obj, sec, str)
 					if i < table.getn(magInfo.compatibleWeapons) then
 						compatibleWeaponsStr = compatibleWeaponsStr .. ','
 					end
-				else
 				end
 			end
 		end
