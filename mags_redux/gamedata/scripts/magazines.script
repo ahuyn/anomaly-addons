@@ -1,0 +1,253 @@
+----------------------------------------------------------------
+-- Refactored magazines by Arti and Raven. Most of this code is cribbed from wuut_mags original, but cleaned up significantly.
+----------------------------------------------------------------
+gc = game.translate_string
+
+local default_mags_map = {}
+
+function print_dbg( text , ...)
+	if true then
+		printf( text , ...)
+	end
+end
+
+local SMALL = 0
+local MEDIUM = 1
+local LARGE = 2
+
+-- each datum consists of the following:
+-- .slot = size of the slot S, M, L(this is not super important)
+-- .loaded = this is a stack of rounds loaded in the magazine, each round is int, depending on what kind of round it is
+-- .section = for magazines in weapons, this tracks the type of magazine that is loaded
+local mags_storage = {}
+-- this storage is for vested mags in specific
+local carried_mags = {}
+
+-- global flag to interrupt reloads (set on key press and stuff)
+local interrupt_reload = true
+
+------------------------
+-- SECTION debug info --
+------------------------
+function print_dbg( text , ...)
+	if true then
+		printf( text , ...)
+	end
+end
+
+function dump_data(data)
+    print_dbg("Mag size: %s. Rounds loaded: %s. Section: %s", data.slot, #data.loaded, data.section)
+end
+-----------------------------
+-- SECTION data management --
+-----------------------------
+
+function save_state(m_data)
+	m_data.mags_storage = mags_storage
+end
+
+function load_state(m_data) 
+	mags_storage = m_data.mags_storage or {}
+end
+
+local function server_entity_on_unregister(se_obj)
+	if mags_storage[se_obj.id] then
+		mags_storage[se_obj.id] = nil
+	end
+end
+
+function get_data(id)
+	return mags_storage[id] or nil
+end
+
+function set_data(id, data)
+	mags_storage[id] = data
+end
+
+-------------------------------
+-- SECTION utility functions --
+-------------------------------
+-- check if this weapon takes a magazine, and return the base type. nil if it does not
+function weapon_uses_magazine(weapon)
+	local weapon_base = SYS_GetParam(0, weapon:section(), "parent_section") or "nope"
+	return default_mags_map[weapon_base] ~= nil
+end
+
+-- check if mag is compatible w. weapon
+function is_compatible(weapon, magazine)
+	local weapon_base = SYS_GetParam(0, weapon:section(), "parent_section") or nil
+	local magazine_base = SYS_GetParam(0, magazine:section(), "parent_section") or nil
+	return default_mags_map[parent] == magazine_base
+end
+
+function weapon_default_magazine(weapon)
+	local parent = SYS_GetParam(0, weapon:section(), "parent_section") or "nope"
+	return default_mags_map[parent] or nil
+end
+
+-- load all the base types in memory
+function init_defaults()
+	ini_mag_section = ini_file("items\\settings\\weapon_mag_sections.ltx")
+	local n = ini_mag_section:line_count("weapon_mag_sections")
+	for i=1, n do
+		result, id, value = ini_mag_section:r_line_ex("weapon_mag_sections",i,"","")
+		local m = ini_mag_section:line_count("weapon_mag_sections")
+	end
+end
+--------------------------------------
+-- SECTION mag un/loading functions --
+--------------------------------------
+function on_item_drag_dropped(item, weapon, from_slot, to_slot)
+
+	print_dbg("on_item_drag_dropped " .. item:section() .. " on " .. weapon:section() .. " to_slot " .. to_slot)
+
+	-- Check capability
+	if not (from_slot == EDDListType.iActorBag and (to_slot == EDDListType.iActorBag or to_slot == EDDListType.iActorSlot ) ) then
+        return
+    end
+	if(item:id() == weapon:id()) then
+		return
+	end
+	-- bullet to mag
+	if(IsAmmo(item) and isMagazine(weapon)) then
+		-- check compatibility, then fire (heh) the loading loop
+		local ammos = invert_table(str_explode(SYS_GetParam(0, weapon:section(), "mag_ammo_class"), ","))
+		local ammo_sec = item:section()
+		if ammos[ammo_sec] ~= nil then
+			-- start loading loop
+			load_magazine(weapon, item, ammos[ammo_sec]);
+		end
+	end
+	-- mag to weapon
+	if IsMagazine(item) and IsWeapon(weapon) and is_compatible(weapon, item) then
+		-- init loading of weapon
+		load_weapon(weapon, item)	
+	end
+end
+
+function load_weapon(weapon, magazine)
+	if IsMagazine(magazine) and IsWeapon(weapon) and is_compatible(weapon, magazine) then
+		local wep_id = weapon:id()
+		local mag_id = magazine:id()
+		if mags_storage[wep_id] ~= nil then
+			eject_magazine(weapon)
+		end
+		-- check for empty mag and initialize
+		if mags_storage[mag_id] ~= nil then
+			local mag_data = copy_table(mags_storage[mag_id])
+			mag_data.section = magazine:section()
+			mags_storage[wep_id] =  mag_data
+			mags_storage[mag_id] =  nil
+		end
+	end
+end
+
+function check_eject_magazine(weapon)
+	if mags_storage[weapon:id()] then
+		return gc("st_mag_eject_magazine")
+	end
+end
+function eject_magazine(weapon)
+	local id = weapon:id()
+	local mag_data = mags_storage[id]
+	if mag_data then
+		se_mag = alife_create_item(mag_data.section, db.actor)
+		local copy = copy_table(mag_data)
+		copy.section = nil
+		mags_storage[se_mag.id] = copy
+		mags_storage[id] = nil
+	end
+end
+
+function actor_on_weapon_reload(actor, weapon, ammo_total)
+	
+	local weapon = db.actor:item_in_slot(db.actor:active_slot())
+	local magData = mags_storage[weapon:id()]
+	
+	-- cancel reload only if we have a valid mag
+	if not weapon_uses_magazine(weapon) then return end
+
+	--if(flag_weapon_jammed == false) then
+	if not is_grenade_mode() then
+		-- do the reload
+
+	end
+
+end
+
+function is_grenade_mode()
+	local weapon = db.actor:item_in_slot(db.actor:active_slot())
+	if(weapon) then
+		return weapon:get_state() == 10
+	end
+	return false
+end
+-----------------------------------------
+-- SECTION rounds un/loading functions --
+-----------------------------------------
+-- iterate inventory and return the next box for this ammo type. return nil if nothing found
+function find_next_box(ammo_box)
+
+end
+
+local delay = 400
+function load_magazine(magazine, ammo_box, position)
+	if interrupt_reload then 
+		return 
+	end
+
+	local id = magazine:id()
+	local mag_data = mags_storage[id]
+	
+	
+	CreateTimeEvent(0,"load_mag " .. id, delay, load_magazine, magazine, ammo_box, position)
+end
+
+function unload_magazine(magazine)
+
+end
+
+function on_key_press(key)
+	if not interrupt_reload then
+		interrupt_reload = true
+	end
+end
+
+-----------------------------------------
+-- SECTION one time setup --
+-----------------------------------------
+-- has to consider custom other shit
+function init_mags_map() 
+	ini_mag_section = ini_file("items\\settings\\weapon_defaults_vanilla.ltx")
+	local n = ini_mag_section:line_count("weapon_mag_sections_vanilla")
+	for i=1, n do
+		result, id, value = ini_mag_section:r_line_ex("weapon_mag_sections_vanilla",i,"","")
+		weapons = str_explode(value,",")
+		for k,v in pairs(weapons) do
+			default_mags_map[v] = id
+		end
+	end
+end
+
+function on_game_start()
+
+	init_mags_map()
+	RegisterScriptCallback("on_key_press", on_key_press)
+	RegisterScriptCallback("actor_on_weapon_fired", actor_on_weapon_fired)
+	RegisterScriptCallback("actor_on_weapon_reload", actor_on_weapon_reload)
+	RegisterScriptCallback("actor_on_weapon_jammed", weapon_jammed)
+	RegisterScriptCallback("ActorMenu_on_item_focus_receive", on_item_focus)
+	RegisterScriptCallback("ActorMenu_on_item_drag_drop", on_item_drag_dropped)
+	RegisterScriptCallback("actor_on_hud_animation_end", animation_end)
+	RegisterScriptCallback("npc_on_death_callback", wuut_npc_on_death_callback)
+	RegisterScriptCallback("ActorMenu_on_trade_started",wuut_OnTrdWndOpened)
+	RegisterScriptCallback("actor_item_to_ruck", UpdateMagazineUI)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	if (USE_MARSHAL) then
+		RegisterScriptCallback("save_state",save_state)
+		RegisterScriptCallback("load_state",load_state)
+	end
+	RegisterScriptCallback("server_entity_on_unregister", server_entity_on_unregister)
+	-- AddUniqueCall(main_loop)
+	
+end 

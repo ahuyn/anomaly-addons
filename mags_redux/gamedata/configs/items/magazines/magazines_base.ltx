@@ -1,0 +1,89 @@
+; Base sections everyone inherits
+[mag_wpn_base]:tch_part
+visual				                                   = dynamics\part\prt_o_retardant_3.ogf
+description			                                   = st_mag_base_descr
+inv_name			                                   = st_mag_base
+inv_name_short		                                   = st_mag_base
+inv_grid_width                           = 1
+inv_grid_height                          = 1
+inv_grid_x                     					       = 22
+inv_grid_y               				               = 1
+inv_weight			                                   = 0.1
+cost                                                   = 110
+repair_type				                               = 
+snd_on_take								 		   	   = outfit
+tier                                                   = 3
+is_mag = true
+equipped = false
+use1_functor         								   = magazines.unload_ammo ;wuut_mags.mag_unload_ammo_precondition
+use1_action_functor  								   = magazines.func_unload_ammo ;wuut_mags.mag_unload_ammo_functor
+
+use6_functor                                       = wuut_mags.add_mag_to_loadout_precondition
+use6_action_functor                                = wuut_mags.add_mag_to_loadout_functor
+
+max_mag_size										   = 0
+can_stack 								 = false
+dont_stack								 = true
+use_condition                            = true
+
+kind                                     = w_ammo
+icons_texture							 = ui\ui_icon_wuut_magazines
+; we gonna need this?
+;[mag_ready]
+;equipped = true
+;quest_item			                     = true
+;can_trade                                = false
+
+; pistol caliber ammo
+[ag_ammo_9x18_fmj]
+mag_ammo_class			= ammo_9x18_fmj, ammo_9x18_fmj_bad, ammo_9x18_fmj_verybad, ammo_9x18_pmm, ammo_9x18_pmm_bad, ammo_9x18_pmm_verybad, ammo_9x18_ap, ammo_9x18_ap_bad, ammo_9x18_ap_verybad
+
+[ag_ammo_9x19_fmj]
+mag_ammo_class			= ammo_9x19_fmj, ammo_9x19_fmj_bad, ammo_9x19_fmj_verybad, ammo_9x19_pbp, ammo_9x19_pbp_bad, ammo_9x19_pbp_verybad, ammo_9x19_ap, ammo_9x19_ap_bad, ammo_9x19_ap_verybad
+
+[ag_ammo_11.43x23_fmj]
+mag_ammo_class          = ammo_11.43x23_fmj, ammo_11.43x23_fmj_bad, ammo_11.43x23_fmj_verybad, ammo_11.43x23_hydro, ammo_11.43x23_hydro_bad, ammo_11.43x23_hydro_verybad
+
+[ag_ammo_7.62x25_p]
+mag_ammo_class          = ammo_7.62x25_p, ammo_7.62x25_p_bad, ammo_7.62x25_p_verybad, ammo_7.62x25_ps, ammo_7.62x25_ps_bad, ammo_7.62x25_ps_verybad
+
+[ag_ammo_357_hp_mag]
+mag_ammo_class          = ammo_357_hp_mag, ammo_357_hp_mag_bad, ammo_357_hp_mag_verybad
+
+[ag_ammo_5.7x28_ss190]
+mag_ammo_class          = ammo_5.7x28_ss190, ammo_5.7x28_ss190_bad, ammo_5.7x28_ss190_verybad, ammo_5.7x28_ss195, ammo_5.7x28_ss195_bad, ammo_5.7x28_ss195_verybad
+
+; rifle
+[ag_ammo_9x39_pab9]
+mag_ammo_class			= ammo_9x39_pab9, ammo_9x39_pab9_bad, ammo_9x39_pab9_verybad, ammo_9x39_ap, ammo_9x39_ap_bad, ammo_9x39_ap_verybad
+
+[ag_ammo_5.45x39]
+mag_ammo_class          = ammo_5.45x39_fmj, ammo_5.45x39_fmj_bad, ammo_5.45x39_fmj_verybad, ammo_5.45x39_ep, ammo_5.45x39_ep_bad, ammo_5.45x39_ep_verybad, ammo_5.45x39_ap, ammo_5.45x39_ap_bad, ammo_5.45x39_ap_verybad
+
+[ag_ammo_5.56x45]
+mag_ammo_class          = ammo_5.56x45_fmj, ammo_5.56x45_fmj_bad, ammo_5.56x45_fmj_verybad, ammo_5.56x45_ss190, ammo_5.56x45_ss190_bad, ammo_5.56x45_ss190_verybad, ammo_5.56x45_ap, ammo_5.56x45_ap_bad, ammo_5.56x45_ap_verybad
+
+[ag_ammo_7.62x39]
+mag_ammo_class		    = ammo_7.62x39_fmj, ammo_7.62x39_fmj_bad, ammo_7.62x39_fmj_verybad, ammo_7.62x39_ap, ammo_7.62x39_ap_bad, ammo_7.62x39_ap_verybad
+
+[ag_ammo_12.7x55]
+mag_ammo_class          = ammo_12.7x55_fmj, ammo_12.7x55_fmj_bad, ammo_12.7x55_fmj_verybad, ammo_12.7x55_ap, ammo_12.7x55_ap_bad, ammo_12.7x55_ap_verybad
+
+[ag_ammo_7.62x51]
+mag_ammo_class          = ammo_7.62x51_fmj, ammo_7.62x51_fmj_bad, ammo_7.62x51_fmj_verybad, ammo_7.62x51_ap, ammo_7.62x51_ap_bad, ammo_7.62x51_ap_verybad
+
+[ag_ammo_7.92x33]
+mag_ammo_class          = ammo_7.92x33_fmj, ammo_7.92x33_fmj_bad, ammo_7.92x33_fmj_verybad, ammo_7.92x33_ap, ammo_7.92x33_ap_bad, ammo_7.92x33_ap_verybad
+
+[ag_ammo_pkm]
+mag_ammo_class          = ammo_pkm_100, ammo_pkm_100_bad, ammo_pkm_100_verybad, ammo_7.62x54_ap, ammo_7.62x54_ap_bad, ammo_7.62x54_ap_verybad
+
+[ag_ammo_7.62x54]
+mag_ammo_class          = ammo_7.62x54_7h1, ammo_7.62x54_7h1_bad, ammo_7.62x54_7h1_verybad, ammo_7.62x54_ap, ammo_7.62x54_ap_bad, ammo_7.62x54_ap_verybad, ammo_7.62x54_7h14, ammo_7.62x54_7h14_bad, ammo_7.62x54_7h14_verybad
+
+; heavy
+[ag_ammo_magnum_300]
+mag_ammo_class			= ammo_magnum_300, ammo_magnum_300_bad, ammo_magnum_300_verybad
+
+[ag_ammo_12.7x55]
+mag_ammo_class          = ammo_12.7x55_fmj, ammo_12.7x55_fmj_bad, ammo_12.7x55_fmj_verybad, ammo_12.7x55_ap, ammo_12.7x55_ap_bad, ammo_12.7x55_ap_verybad

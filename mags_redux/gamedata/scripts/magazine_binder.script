@@ -1,0 +1,75 @@
+
+-- class
+function bind(obj)
+    -- print_dbg("bound object "..obj:section())
+    obj:bind_object(magazine_binder(obj))
+end
+
+class "magazine_binder" (object_binder)
+
+function magazine_binder:__init(obj) super(obj)
+	self.first_update = nil
+    -- init the mag data structure
+    local mag_data = {}
+    mag_data.loaded = {}
+    mag_data.slot = SYS_GetParam(2, self.obj:section(), "mag_size")
+    mag_data.section = self.obj:section()
+    magazines.set_data(self.obj:id(), mag_data)
+end
+
+-- update the weight and condition based on capacity
+function magazine_binder:update(delta)
+    
+	local obj = self.object
+	local id = obj:id()
+	local sec = obj:section()
+    local mag_data = magazines.get_data(id)
+    if not mag_data then
+        mag_data = {}
+        mag_data.loaded = {}
+        mag_data.slot = SYS_GetParam(2, self.obj:section(), "mag_size")
+        mag_data.section = self.obj:section()
+        magazines.set_data(self.obj:id(), mag_data)
+    end
+    
+	local mag_weight = SYS_GetParam(2, sec, "inv_weight")
+    local capacity = SYS_GetParam(2, sec, "max_mag_size")
+    -- for simplicity we take the weight of each bullet to be the same
+    local cond = 0
+    if data then
+		local ammoType = str_explode(SYS_GetParam(0, sec, "mag_ammo_class"), ",")[1]
+		local box_size = SYS_GetParam(2, ammoType, "box_size")
+		local box_weight = SYS_GetParam(2, ammoType, "inv_weight")
+		local cartridge_weight = box_weight / box_size
+        cond = #data.loaded / capacity
+        mag_weight = mag_weight + (#data.loaded * cartridge_weight)
+    end
+    obj:set_weight(mag_weight)
+    obj:set_condition(cond)
+end
+
+function magazine_binder:reload(section)
+    object_binder.reload(self, section)
+end
+
+function magazine_binder:reinit()
+    object_binder.reinit(self)
+end
+
+function magazine_binder:net_spawn(se_abstract)
+    if not(object_binder.net_spawn(self, se_abstract)) then
+        return false
+    end
+    return true
+end
+
+function magazine_binder:net_destroy()
+	object_binder.net_destroy(self)
+end
+
+function magazine_binder:save(stpk)
+end
+
+function magazine_binder:load(stpk)
+end
+-- end class
