@@ -3,9 +3,13 @@ function push(table, value)
 end
 
 function pop(table)
-    local value = table[#table]
-    table[#table] = nil
-    return value
+    if #table > 0 then
+        local value = table[#table]
+        table[#table] = nil
+        return value
+    else
+        return nil
+    end
 end
 
 function peek(table)

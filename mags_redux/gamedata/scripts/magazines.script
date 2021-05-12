@@ -85,6 +85,11 @@ function weapon_default_magazine(weapon)
 	return default_mags_map[parent] or nil
 end
 
+function is_magazine(item)
+	local is_mag = SYS_GetParam(1, item:section(), "is_mag")
+	return is_mag or false
+end
+
 -- load all the base types in memory
 function init_defaults()
 	ini_mag_section = ini_file("items\\settings\\weapon_mag_sections.ltx")
@@ -186,30 +191,81 @@ end
 -- SECTION rounds un/loading functions --
 -----------------------------------------
 -- iterate inventory and return the next box for this ammo type. return nil if nothing found
-function find_next_box(ammo_box)
-
+function find_next_box(ammo_section)
+	local item_to_get = nil
+	function grab_inv_items(npc, item)
+		if IsAmmo(item) then 
+			print_dbg("ammo: " .. item:section())
+			if ammo_section == item:section() then
+				-- true_ammo_box_size = true_ammo_box_size + item:ammo_get_count()
+				-- print_dbg("ammo-size: " .. true_ammo_box_size)
+				item_to_get = item
+			end
+		end
+	end
+	return item_to_get
 end
 
 local delay = 400
+-- position is ammo type as number
 function load_magazine(magazine, ammo_box, position)
-	if interrupt_reload then 
+	if interrupt_reload or not ammo_box then 
 		return 
 	end
 
 	local id = magazine:id()
 	local mag_data = mags_storage[id]
-	
-	
+	local num_bullets = ammo_box:ammo_get_count()
+	local ammo_section = ammo_box:section()
+	if num_bullets == 1 then
+		alife_release_id(ammo_box:id())
+		ammo_box = find_next_box(ammo_section)
+	else
+		ammo_box:ammo_set_count(num_bullets - 1)
+	end
+	stack.push(mag_data.loaded, position)
+	mags_storage[id] = mag_data
 	CreateTimeEvent(0,"load_mag " .. id, delay, load_magazine, magazine, ammo_box, position)
 end
 
-function unload_magazine(magazine)
+function unload_magazine(magazine, rounds_map)
+	local id = magazine:id()
+	local mag_data = mags_storage[id]
+	if not mag_data or #mag_data.loaded == 0 or interrupt_reload then
+		return
+	end
 
+	local round = stack.pop(mag_data.loaded)
+	if round ~= nil then
+		create_ammo(rounds_map[round + 1], db.actor:position(), db.actor:level_vertex_id(), db.actor:game_vertex_id(), AC_ID, 1)
+		CreateTimeEvent(0,"unload_mag " .. id, delay, unload_magazine, magazine, rounds_map)
+	end
 end
 
 function on_key_press(key)
 	if not interrupt_reload then
 		interrupt_reload = true
+	end
+end
+
+function unload_ammo(obj)
+	if is_magazine(obj) then
+		local id = obj:id()
+		local mag_data = mags_storage[id]
+		if mag_data and #mag_data.loaded > 0 then
+			return gc("st_mag_unload_ammo")
+		end
+	end
+end
+
+function func_unload_ammo(obj)
+	if is_magazine(obj) then
+		local id = obj:id()
+		local mag_data = mags_storage[id]
+		if mag_data and #mag_data.loaded > 0 then
+			local round_map = str_explode(SYS_GetParam(0, obj:section(), "mag_ammo_class"))
+			CreateTimeEvent(0,"unload_mag " .. id, delay, unload_magazine, obj, rounds_map)
+		end
 	end
 end
 
