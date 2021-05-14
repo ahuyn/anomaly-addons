@@ -90,15 +90,6 @@ function is_magazine(item)
 	return is_mag or false
 end
 
--- load all the base types in memory
-function init_defaults()
-	ini_mag_section = ini_file("items\\settings\\weapon_mag_sections.ltx")
-	local n = ini_mag_section:line_count("weapon_mag_sections")
-	for i=1, n do
-		result, id, value = ini_mag_section:r_line_ex("weapon_mag_sections",i,"","")
-		local m = ini_mag_section:line_count("weapon_mag_sections")
-	end
-end
 --------------------------------------
 -- SECTION mag un/loading functions --
 --------------------------------------
@@ -170,14 +161,11 @@ function actor_on_weapon_reload(actor, weapon, ammo_total)
 	local magData = mags_storage[weapon:id()]
 	
 	-- cancel reload only if we have a valid mag
-	if not weapon_uses_magazine(weapon) then return end
+	if not weapon_uses_magazine(weapon) or is_grenade_mode() then return end
 
-	--if(flag_weapon_jammed == false) then
-	if not is_grenade_mode() then
 		-- do the reload
-
-	end
-
+	weapon:switch_state(stateReload)
+		
 end
 
 function is_grenade_mode()
@@ -209,7 +197,7 @@ end
 local delay = 400
 -- position is ammo type as number
 function load_magazine(magazine, ammo_box, position)
-	if interrupt_reload or not ammo_box then 
+	if interrupt_reload or ammo_box == nil then 
 		return 
 	end
 
@@ -270,7 +258,43 @@ function func_unload_ammo(obj)
 end
 
 -----------------------------------------
--- SECTION one time setup --
+-- SECTION weapon logic -----------------
+-----------------------------------------
+
+function actor_on_weapon_before_fired(flags)
+	local weapon = db.actor:item_in_slot(db.actor:active_slot())
+	local id = weapon:id()
+	if mags_storage[id] then
+		if #mags_storage[id].loaded > 0 and weapon:get_ammo_elapsed() == 0 then
+			load_weapon(weapon, true)
+		end
+	end
+end
+
+function actor_on_weapon_fired(obj, weapon, ammo_elapsed, grenade_elapsed, ammo_type, grenade_type)
+	if weapon_jammed or is_grenade_mode() then
+		return
+	end
+	load_weapon(weapon, true)
+end
+
+-- Load next round into the weapon. feed_next is used to actually remove the round from magazine.
+function load_weapon(weapon, feed_next)
+	local id = weapon:id()
+	if mags_storage[id] then
+		local mag_data = mags_storage[id]
+		local round = feed_next and stack.pop(mag_data.loaded) or stack.peek(mag_data.loaded)
+		local ammo_elapsed = round ~= nil and 1 or 0
+		
+		weapon:unload_magazine()
+		weapon:set_ammo_type(round)
+		weapon:set_ammo_elapsed(ammo_elapsed)
+		mags_storage[id] = mag_data
+	end
+end
+
+-----------------------------------------
+-- SECTION one time setup ---------------
 -----------------------------------------
 -- has to consider custom other shit
 function init_mags_map() 
@@ -282,6 +306,17 @@ function init_mags_map()
 		for k,v in pairs(weapons) do
 			default_mags_map[v] = id
 		end
+	end
+end
+
+
+-- load all the base types in memory
+function init_defaults()
+	ini_mag_section = ini_file("items\\settings\\weapon_mag_sections.ltx")
+	local n = ini_mag_section:line_count("weapon_mag_sections")
+	for i=1, n do
+		result, id, value = ini_mag_section:r_line_ex("weapon_mag_sections",i,"","")
+		local m = ini_mag_section:line_count("weapon_mag_sections")
 	end
 end
 

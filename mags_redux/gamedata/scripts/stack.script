@@ -13,5 +13,5 @@ function pop(table)
 end
 
 function peek(table)
-    return table[#table]
+    return #table == 0 and nil or table[#table]
 end
